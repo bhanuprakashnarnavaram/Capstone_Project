@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Text Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            border: none;
+            background-color: #28a745;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Speech to Text Converter</h1>
+        <button id="start-record-btn">Start Recording</button>
+        <button id="stop-record-btn" disabled>Stop Recording</button>
+        <p id="instructions">Press the start button and speak into the microphone.</p>
+        <textarea id="speech-to-text" rows="10" placeholder="Your transcribed speech will appear here..."></textarea>
+    </div>
+
+    <script>
+        // Check if the Web Speech API is supported by the browser
+        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!window.SpeechRecognition) {
+            alert('Sorry, your browser does not support speech recognition. Please try Chrome or Edge.');
+        } else {
+            const recognition = new window.SpeechRecognition();
+            recognition.interimResults = true; // Get partial results while the user is speaking
+            recognition.continuous = true; // Continue listening until manually stopped
+
+            const startRecordBtn = document.getElementById('start-record-btn');
+            const stopRecordBtn = document.getElementById('stop-record-btn');
+            const speechToText = document.getElementById('speech-to-text');
+            const instructions = document.getElementById('instructions');
+
+            let isRecording = false;
+
+            // Start recording
+            startRecordBtn.addEventListener('click', () => {
+                if (!isRecording) {
+                    recognition.start();
+                    isRecording = true;
+                    startRecordBtn.disabled = true;
+                    stopRecordBtn.disabled = false;
+                    instructions.textContent = "Recording... Please speak.";
+                }
+            });
+
+            // Stop recording
+            stopRecordBtn.addEventListener('click', () => {
+                if (isRecording) {
+                    recognition.stop();
+                    isRecording = false;
+                    startRecordBtn.disabled = false;
+                    stopRecordBtn.disabled = true;
+                    instructions.textContent = "Recording stopped.";
+                }
+            });
+
+            // Capture the speech and update the text area
+            recognition.addEventListener('result', (event) => {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0])
+                    .map(result => result.transcript)
+                    .join('');
+
+                speechToText.value = transcript;
+            });
+
+            // Handle when recognition ends (automatically stop on errors)
+            recognition.addEventListener('end', () => {
+                if (isRecording) {
+                    recognition.start(); // Restart recognition automatically if it ends unexpectedly
+                }
+            });
+        }
+    </script>
+</body>
+</html>

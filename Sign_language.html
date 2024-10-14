@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Gesture and Emotion Recognition</title>
+    <link rel="stylesheet" href="styles.css"> <!-- Link to CSS file -->
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #e9ecef; /* Slightly different background color */
+        }
+
+        #webcam {
+            width: 640px;
+            height: 480px;
+            border: 2px solid #007bff;
+            border-radius: 12px; /* Increased border radius */
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Slightly larger shadow */
+        }
+
+        #sign-output, #emotion-output {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 10px;
+            color: #333;
+        }
+
+        #sign-text {
+            font-size: 20px;
+            text-align: center;
+            display: block;
+            margin-top: 10px;
+            border: 2px solid #007bff;
+            padding: 10px;
+            width: 300px;
+            border-radius: 8px; /* Increased border radius */
+            background-color: #ffffff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Slightly larger shadow */
+        }
+
+        h1 {
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #webcam {
+                width: 100%;
+                height: auto;
+            }
+
+            #sign-text {
+                width: 80%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Gesture & Emotion Recognition</h1>
+    <video id="webcam" autoplay playsinline></video>
+    <div id="sign-output">Recognized Sign: None</div>
+    <input type="text" id="sign-text" readonly>
+    <div id="emotion-output">Detected Emotion: None</div> <!-- Emotion output -->
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh"></script> <!-- Add face mesh model -->
+
+    <script>
+        const video = document.getElementById('webcam');
+        const signOutput = document.getElementById('sign-output');
+        const signText = document.getElementById('sign-text');
+        const emotionOutput = document.getElementById('emotion-output');
+
+        // Load the handpose and facemesh models
+        let handposeModel, faceMeshModel;
+        async function loadModels() {
+            handposeModel = await handpose.load();
+            console.log("Handpose model loaded.");
+            faceMeshModel = await facemesh.load(); // Load face mesh model
+            console.log("Face mesh model loaded.");
+        }
+
+        // Start the webcam
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        resolve(video);
+                    };
+                });
+            } catch (error) {
+                console.error("Error accessing the camera: ", error);
+                signOutput.innerText = "Error accessing the camera. Please check permissions.";
+            }
+        }
+
+        // Recognize signs based on hand landmark positions
+        async function detectHands() {
+            const predictions = await handposeModel.estimateHands(video);
+
+            if (predictions.length > 0) {
+                const hand = predictions[0].landmarks; // Get the first detected hand
+                const palm = hand[0]; // Palm position (landmark index 0)
+                const indexFinger = hand[8]; // Index finger position (landmark index 8)
+
+                // Calculate distance between palm and index finger
+                const distance = Math.sqrt(
+                    Math.pow(indexFinger[0] - palm[0], 2) + 
+                    Math.pow(indexFinger[1] - palm[1], 2)
+                );
+
+                // Gesture recognition logic
+                if (distance < 50) { 
+                    signOutput.innerText = "Recognized Sign: Thumbs Up";
+                    signText.value = "Thumbs Up"; 
+                } else if (distance < 100) { 
+                    signOutput.innerText = "Recognized Sign: Hello";
+                    signText.value = "Hello"; 
+                } else if (distance < 150) { 
+                    signOutput.innerText = "Recognized Sign: Thanks";
+                    signText.value = "Thanks"; 
+                } else if (distance < 200) { 
+                    signOutput.innerText = "Recognized Sign: Bye";
+                    signText.value = "Bye"; 
+                } else {
+                    signOutput.innerText = "Recognized Sign: Unknown";
+                    signText.value = ""; 
+                }
+            } else {
+                signOutput.innerText = "Recognized Sign: No Hand Detected";
+                signText.value = ""; 
+            }
+
+            requestAnimationFrame(detectHands); 
+        }
+
+        // Emotion recognition using face mesh
+        async function detectFaceEmotion() {
+            const predictions = await faceMeshModel.estimateFaces(video);
+            
+            if (predictions.length > 0) {
+                const keypoints = predictions[0].scaledMesh;
+                
+                // Simple emotion detection based on keypoints position (for demo purposes)
+                const mouthOpen = keypoints[10][1] < keypoints[152][1]; // Check if mouth is open (index based on mesh)
+                
+                if (mouthOpen) {
+                    emotionOutput.innerText = "Detected Emotion: Happy";
+                } else {
+                    emotionOutput.innerText = "Detected Emotion: Neutral";
+                }
+            } else {
+                emotionOutput.innerText = "Detected Emotion: No Face Detected";
+            }
+
+            requestAnimationFrame(detectFaceEmotion);
+        }
+
+        // Main function
+        async function main() {
+            await loadModels(); // Load models
+            await setupCamera(); // Set up the camera
+            video.play(); // Play the video
+            detectHands(); // Start detecting hands
+            detectFaceEmotion(); // Start detecting face emotion
+        }
+
+        // Run the main function
+        main();
+    </script>
+</body>
+</html>
