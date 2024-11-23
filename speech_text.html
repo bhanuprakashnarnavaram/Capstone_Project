@@ -3,42 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speech to Text Converter</title>
+    <title>Speech to Text & Text-to-Speech Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            background-color: #eef2f3;
             color: #333;
             text-align: center;
+            margin: 0;
             padding: 20px;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            overflow-x: hidden;
         }
 
         h1 {
             margin-bottom: 20px;
+            font-size: 2.5rem;
+            color: #03274e;
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            animation: slideUp 1.5s ease-in-out;
+        }
+
+        .card h3 {
+            margin-bottom: 15px;
+            color: #03274e;
         }
 
         button {
             padding: 10px 20px;
-            margin: 10px;
+            margin: 10px 0;
             border: none;
-            background-color: #28a745;
+            background-color: #007bff;
             color: white;
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
         }
 
         button:disabled {
             background-color: #ccc;
+            cursor: not-allowed;
         }
 
         textarea {
@@ -46,35 +73,86 @@
             padding: 10px;
             border-radius: 5px;
             border: 1px solid #ccc;
-            margin-top: 20px;
+            margin-top: 10px;
             font-size: 16px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        @keyframes slideUp {
+            0% {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
         }
     </style>
 </head>
 <body>
+    <h1>Worry less</h1>
     <div class="container">
-        <h1>Speech to Text Converter</h1>
-        <button id="start-record-btn">Start Recording</button>
-        <button id="stop-record-btn" disabled>Stop Recording</button>
-        <p id="instructions">Press the start button and speak into the microphone.</p>
-        <textarea id="speech-to-text" rows="10" placeholder="Your transcribed speech will appear here..."></textarea>
+        <!-- Speech-to-Text Section -->
+        <div class="card">
+            <h3>Speech-to-Text</h3>
+            <button id="start-record-btn">Start Recording</button>
+            <button id="stop-record-btn" disabled>Stop Recording</button>
+            <button id="play-text-btn" disabled>Play Transcribed Text</button>
+            <button id="download-pdf-btn" disabled>Download as PDF</button>
+            <textarea id="speech-to-text" rows="6" placeholder="Your transcribed speech will appear here..."></textarea>
+        </div>
+
+        <!-- Custom Text-to-Speech Section -->
+        <div class="card">
+            <h3>Custom Text-to-Speech</h3>
+            <textarea id="custom-text" rows="6" placeholder="Paste or type custom text here..."></textarea>
+            <button id="play-custom-text-btn" disabled>Play Custom Text</button>
+        </div>
+
+        <!-- PDF Upload & Read Section -->
+        <div class="card">
+            <h3>PDF Upload & Read</h3>
+            <input type="file" id="pdf-upload" accept="application/pdf" />
+            <textarea id="pdf-text" rows="6" placeholder="Extracted PDF text will appear here..." readonly></textarea>
+            <button id="play-pdf-text-btn" disabled>Play PDF Text</button>
+        </div>
     </div>
 
     <script>
-        // Check if the Web Speech API is supported by the browser
+        // Check if the Web Speech API is supported
         window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!window.SpeechRecognition) {
             alert('Sorry, your browser does not support speech recognition. Please try Chrome or Edge.');
         } else {
             const recognition = new window.SpeechRecognition();
-            recognition.interimResults = true; // Get partial results while the user is speaking
-            recognition.continuous = true; // Continue listening until manually stopped
+            recognition.interimResults = true;
+            recognition.continuous = true;
 
             const startRecordBtn = document.getElementById('start-record-btn');
             const stopRecordBtn = document.getElementById('stop-record-btn');
+            const playTextBtn = document.getElementById('play-text-btn');
+            const downloadPdfBtn = document.getElementById('download-pdf-btn');
             const speechToText = document.getElementById('speech-to-text');
-            const instructions = document.getElementById('instructions');
+            const customText = document.getElementById('custom-text');
+            const playCustomTextBtn = document.getElementById('play-custom-text-btn');
+            const pdfUpload = document.getElementById('pdf-upload');
+            const pdfText = document.getElementById('pdf-text');
+            const playPdfTextBtn = document.getElementById('play-pdf-text-btn');
 
             let isRecording = false;
 
@@ -85,7 +163,6 @@
                     isRecording = true;
                     startRecordBtn.disabled = true;
                     stopRecordBtn.disabled = false;
-                    instructions.textContent = "Recording... Please speak.";
                 }
             });
 
@@ -96,7 +173,6 @@
                     isRecording = false;
                     startRecordBtn.disabled = false;
                     stopRecordBtn.disabled = true;
-                    instructions.textContent = "Recording stopped.";
                 }
             });
 
@@ -108,12 +184,73 @@
                     .join('');
 
                 speechToText.value = transcript;
+
+                // Enable buttons if there is text
+                const hasText = transcript.trim() !== '';
+                playTextBtn.disabled = !hasText;
+                downloadPdfBtn.disabled = !hasText;
             });
 
-            // Handle when recognition ends (automatically stop on errors)
-            recognition.addEventListener('end', () => {
-                if (isRecording) {
-                    recognition.start(); // Restart recognition automatically if it ends unexpectedly
+            // Play text from the text area
+            const playText = (text) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.pitch = 1;
+                utterance.rate = 0.8; // Slower reading speed
+                utterance.volume = 1;
+                window.speechSynthesis.speak(utterance);
+            };
+
+            playTextBtn.addEventListener('click', () => {
+                const text = speechToText.value.trim();
+                if (text) playText(text);
+            });
+
+            playCustomTextBtn.addEventListener('click', () => {
+                const text = customText.value.trim();
+                if (text) playText(text);
+            });
+
+            playPdfTextBtn.addEventListener('click', () => {
+                const text = pdfText.value.trim();
+                if (text) playText(text);
+            });
+
+            // Enable play button for custom text
+            customText.addEventListener('input', () => {
+                playCustomTextBtn.disabled = customText.value.trim() === '';
+            });
+
+            // Download the transcribed text as a PDF
+            downloadPdfBtn.addEventListener('click', () => {
+                const text = speechToText.value.trim();
+                if (text) {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    doc.text(text, 10, 10);
+                    doc.save('transcribed-text.pdf');
+                }
+            });
+
+            // Extract text from uploaded PDF using pdf.js
+            pdfUpload.addEventListener('change', async (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const fileReader = new FileReader();
+                    fileReader.onload = async () => {
+                        const typedArray = new Uint8Array(fileReader.result);
+                        const pdf = await pdfjsLib.getDocument(typedArray).promise;
+                        let extractedText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            const textItems = content.items.map((item) => item.str);
+                            extractedText += textItems.join(' ') + '\n';
+                        }
+                        pdfText.value = extractedText.trim();
+                        playPdfTextBtn.disabled = extractedText.trim() === '';
+                    };
+                    fileReader.readAsArrayBuffer(file);
                 }
             });
         }
